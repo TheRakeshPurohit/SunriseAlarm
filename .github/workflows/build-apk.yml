@@ -1,0 +1,110 @@
+name: Build APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  assemble-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android platform 35
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Prepare release keystore
+        id: keystore
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYSTORE_PATH="${RUNNER_TEMP}/release.keystore"
+          if [ -n "${RELEASE_KEYSTORE_BASE64:-}" ] \
+            && [ -n "${RELEASE_KEYSTORE_PASSWORD:-}" ] \
+            && [ -n "${RELEASE_KEY_ALIAS:-}" ] \
+            && [ -n "${RELEASE_KEY_PASSWORD:-}" ]; then
+            echo "Using production keystore from GitHub secrets"
+            echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_PATH"
+            {
+              echo "RELEASE_STORE_FILE=$KEYSTORE_PATH"
+              echo "RELEASE_STORE_PASSWORD=$RELEASE_KEYSTORE_PASSWORD"
+              echo "RELEASE_KEY_ALIAS=$RELEASE_KEY_ALIAS"
+              echo "RELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD"
+            } >> "$GITHUB_ENV"
+            echo "mode=prod" >> "$GITHUB_OUTPUT"
+          else
+            echo "Release secrets not fully set; generating ephemeral CI keystore."
+            echo "For Play Store uploads, add secrets: RELEASE_KEYSTORE_BASE64, RELEASE_KEYSTORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD."
+            CI_PASS="$(openssl rand -base64 32)"
+            keytool -genkeypair \
+              -keystore "$KEYSTORE_PATH" \
+              -storepass "$CI_PASS" \
+              -keypass "$CI_PASS" \
+              -alias ci \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Sunrise Alarm CI, OU=CI, O=SunriseAlarm, L=CI, ST=CI, C=US"
+            {
+              echo "RELEASE_STORE_FILE=$KEYSTORE_PATH"
+              echo "RELEASE_STORE_PASSWORD=$CI_PASS"
+              echo "RELEASE_KEY_ALIAS=ci"
+              echo "RELEASE_KEY_PASSWORD=$CI_PASS"
+            } >> "$GITHUB_ENV"
+            echo "mode=ci" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Assemble release APK
+        run: >
+          ./gradlew assembleRelease --no-daemon
+          -PRELEASE_STORE_FILE="${RELEASE_STORE_FILE}"
+          -PRELEASE_STORE_PASSWORD="${RELEASE_STORE_PASSWORD}"
+          -PRELEASE_KEY_ALIAS="${RELEASE_KEY_ALIAS}"
+          -PRELEASE_KEY_PASSWORD="${RELEASE_KEY_PASSWORD}"
+
+      - name: Locate release APK
+        id: apk
+        env:
+          SIGNING_MODE: ${{ steps.keystore.outputs.mode }}
+        run: |
+          set -euo pipefail
+          APK="$(find app/build/outputs/apk/release -type f \( -name '*-release*.apk' -o -name '*.apk' \) | head -n 1)"
+          if [ -z "${APK}" ]; then
+            echo "No release APK found under app/build/outputs/apk/release"
+            find app/build/outputs -type f -name '*.apk' 2>/dev/null || true
+            exit 1
+          fi
+          echo "Found release APK: ${APK}"
+          echo "path=${APK}" >> "$GITHUB_OUTPUT"
+          if [ "${SIGNING_MODE}" = "ci" ]; then
+            echo "NOTE: Signed with ephemeral CI keystore. For Play Store, add the four RELEASE_* secrets with your upload keystore."
+          fi
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: ${{ steps.apk.outputs.path }}
+          if-no-files-found: error

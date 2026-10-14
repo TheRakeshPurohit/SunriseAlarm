@@ -1,0 +1,27 @@
+<resources>
+    <string name="app_name">Sunrise Alarm</string>
+    <string name="location_default_surat">Surat, Gujarat (21.17 N, 72.83 E) — default</string>
+    <string name="location_cached_fmt">Lat %.4f, Lon %.4f</string>
+    <string name="tomorrow_sunrise_label">TOMORROW\'S SUNRISE</string>
+    <string name="today_sunrise_label">Today\'s Sunrise</string>
+    <string name="daily_auto_alarm">Sunrise Auto-Alarm</string>
+    <string name="daily_auto_alarm_desc">Must-fire AlarmManager alarm for next sunrise; reschedules after dismiss and reboot</string>
+    <string name="schedule_next_sunrise">Schedule Next Sunrise Alarm</string>
+    <string name="next_alarm_fmt">Next alarm: %1$s</string>
+    <string name="next_alarm_none">Next alarm: not scheduled</string>
+    <string name="alarm_enabled">Sunrise alarm enabled</string>
+    <string name="alarm_disabled">Sunrise alarm cancelled</string>
+    <string name="alarm_scheduled">Next sunrise alarm scheduled</string>
+    <string name="alarm_schedule_failed">Could not schedule alarm</string>
+    <string name="exact_alarm_required">Allow exact alarms in system settings</string>
+    <string name="location_denied_using_default">Location denied; using cached or Surat default</string>
+    <string name="play_safe_rationale">Uses foreground location once to cache coordinates. Exact alarm and full-screen intent are for the sunrise wake-up only. No background location.</string>
+    <string name="alarm_ringing_title">Sunrise Alarm</string>
+    <string name="alarm_ringing_subtitle">Good morning</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="snooze_5m">Snooze 5 minutes</string>
+    <string name="alarm_notification_title">Sunrise Alarm</string>
+    <string name="alarm_notification_text">Tap to open alarm</string>
+    <string name="alarm_channel_name">Sunrise alarms</string>
+    <string name="alarm_channel_desc">Full-screen sunrise wake-up alarms</string>
+</resources>
